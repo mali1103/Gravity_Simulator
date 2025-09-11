@@ -8,10 +8,11 @@ pygame.display.set_caption("Gravitational Simulation")
 clock = pygame.time.Clock()
 
 GRAV_CONSTANT = 6.67430e-11  # Gravitational constant
-TIME_STEP = 86400  # Time step for simulation
+TIME_STEP = 1000  # Time step for simulation
 ZOOM_SCALE = 6e-11  # Zoom scale for visualization
 SCALE = 1e-9  # Scale to convert simulation units to screen units
 ZOOMED = False  # Zoom state
+PAUSED = False  # Game pause state
 
 
 class Body:
@@ -31,7 +32,8 @@ class Body:
                 dy = body.y - self.y
                 distance = math.sqrt(dx*dx + dy*dy)
                 if distance > 0:
-                    force = (G * self.mass * body.mass) / (distance*distance)
+                    force = (GRAV_CONSTANT * self.mass *
+                             body.mass) / (distance*distance)
                     fx += force * dx / distance
                     fy += force * dy / distance
         ax = (fx) / self.mass
@@ -61,19 +63,11 @@ class Body:
 
 
 planets = [
-    Body(0, 0, 0, 0, 1.989e30, 4, (255, 255, 0)),  # Sun  (1.989e30 kg, 8 pixel radius (not used in calculations, just visual))
-    Body(5.79e10, 0, 0, 47360, 3.301e23, 2, (255, 30, 150)),  # Mercury
-    Body(1.082e11, 0, 0, 35020, 4.867e24, 2, (255, 30, 150)),  # Venus
-    Body(1.496e11, 0, 0, 29780, 5.972e24, 4, (0, 100, 255)),  # Earth
-    Body(279e11, 0, 0, 24077, 6.39e23, 3, (255, 30, 150)),  # Mars
-    Body(7.786e11, 0, 0, 13070, 1.898e27, 2, (255, 30, 150)),  # Jupiter
-    Body(1.432e12, 0, 0, 9680, 5.683e26, 2, (255, 30, 150)),  # Saturn
-    Body(2.867e12, 0, 0, 6810, 8.681e25, 2, (255, 30, 150)),  # Uranus
-    Body(4.515e12, 0, 0, 5430, 1.024e26, 2, (255, 30, 150)),  # Neptune
-    Body(5.906e12, 0, 0, 4670, 1.309e22, 2, (255, 30, 150))  # Pluto
+    # Body(0, 0, 0, 0, 1.989e30, 4, (255, 255, 0)),  # Sun  (1.989e30 kg, 8 pixel radius (not used in calculations, just visual))
 ]
 
 running = True
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -83,13 +77,30 @@ while running:
                 ZOOMED = not ZOOMED
             for body in planets:
                 body.trail = []
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left mouse button
+            if PAUSED:
+                finish_x, finish_y = event.pos
+                velocity_x, velocity_y = (
+                    finish_x - start_x) * 1000, (finish_y - start_y) * 1000
+                current_scale = ZOOM_SCALE if ZOOMED else SCALE
+                planets.append(Body(sim_x, sim_y, velocity_x,
+                               velocity_y, 5e29, 5, (255, 0, 255)))
+                PAUSED = False
+            else:
 
+                start_x, start_y = event.pos
+                current_scale = ZOOM_SCALE if ZOOMED else SCALE
+                sim_x = (start_x - WIDTH // 2) / current_scale
+                sim_y = (start_y - HEIGHT // 2) / current_scale
+                PAUSED = True
     screen.fill((0, 0, 0))
-
-    for body in planets:
-        body.update_position(planets)
-        body.draw(screen)
-
+    if not PAUSED:
+        for body in planets:
+            body.update_position(planets)
+            body.draw(screen)
+    else:
+        for body in planets:
+            body.draw(screen)
     pygame.display.flip()
     clock.tick(60)
 pygame.QUIT
