@@ -1,6 +1,5 @@
-# import numpy as np
-import pygame
 import math
+import pygame
 
 pygame.init()
 WIDTH, HEIGHT = 1500, 1000
@@ -8,11 +7,11 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Gravitational Simulation")
 clock = pygame.time.Clock()
 
-G = 6.67430e-11  # Gravitational constant
+GRAV_CONSTANT = 6.67430e-11  # Gravitational constant
 TIME_STEP = 86400  # Time step for simulation
 ZOOM_SCALE = 6e-11  # Zoom scale for visualization
 SCALE = 1e-9  # Scale to convert simulation units to screen units
-ZOOMED = False
+ZOOMED = False  # Zoom state
 
 
 class Body:
@@ -61,9 +60,8 @@ class Body:
                            (screen_x, screen_y), self.radius)
 
 
-bodies = [
-    # Sun  (1.989e30 kg, 8 pixel radius (not used in calculations, just visual))
-    Body(0, 0, 0, 0, 1.989e30, 4, (255, 255, 0)),
+planets = [
+    Body(0, 0, 0, 0, 1.989e30, 4, (255, 255, 0)),  # Sun  (1.989e30 kg, 8 pixel radius (not used in calculations, just visual))
     Body(5.79e10, 0, 0, 47360, 3.301e23, 2, (255, 30, 150)),  # Mercury
     Body(1.082e11, 0, 0, 35020, 4.867e24, 2, (255, 30, 150)),  # Venus
     Body(1.496e11, 0, 0, 29780, 5.972e24, 4, (0, 100, 255)),  # Earth
@@ -83,15 +81,15 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_z:
                 ZOOMED = not ZOOMED
-            for body in bodies:
+            for body in planets:
                 body.trail = []
 
     screen.fill((0, 0, 0))
 
-    for body in bodies:
-        body.update_position(bodies)
+    for body in planets:
+        body.update_position(planets)
         body.draw(screen)
 
     pygame.display.flip()
     clock.tick(60)
-pygame.quit()
+pygame.QUIT
