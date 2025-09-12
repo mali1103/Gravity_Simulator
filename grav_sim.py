@@ -13,6 +13,9 @@ ZOOM_SCALE = 6e-11  # Zoom scale for visualization
 SCALE = 1e-9  # Scale to convert simulation units to screen units
 ZOOMED = False  # Zoom state
 PAUSED = False  # Game pause state
+myfont = pygame.font.SysFont("monospace", 20)
+
+velocity_x = velocity_y = None  # Add at the top, after other globals
 
 
 class Body:
@@ -31,7 +34,7 @@ class Body:
                 dx = body.x - self.x
                 dy = body.y - self.y
                 distance = math.sqrt(dx*dx + dy*dy)
-                if distance > 0:
+                if distance >= 6e6:
                     force = (GRAV_CONSTANT * self.mass *
                              body.mass) / (distance*distance)
                     fx += force * dx / distance
@@ -47,7 +50,7 @@ class Body:
 
         self.trail.append((int(self.x * current_scale + WIDTH // 2),
                           int(self.y * current_scale + HEIGHT // 2)))
-        if len(self.trail) > 20000:
+        if len(self.trail) > 2000:
             self.trail.pop(0)
 
     def draw(self, screen):
@@ -77,14 +80,12 @@ while running:
                 ZOOMED = not ZOOMED
             for body in planets:
                 body.trail = []
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left mouse button
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:  # Right mouse button
             if PAUSED:
                 finish_x, finish_y = event.pos
-                velocity_x, velocity_y = (
-                    finish_x - start_x) * 1000, (finish_y - start_y) * 1000
                 current_scale = ZOOM_SCALE if ZOOMED else SCALE
                 planets.append(Body(sim_x, sim_y, velocity_x,
-                               velocity_y, 5e29, 5, (255, 0, 255)))
+                               velocity_y, 5e29, 5, (160, 110, 255)))
                 PAUSED = False
             else:
 
@@ -93,6 +94,11 @@ while running:
                 sim_x = (start_x - WIDTH // 2) / current_scale
                 sim_y = (start_y - HEIGHT // 2) / current_scale
                 PAUSED = True
+        if event.type == pygame.MOUSEMOTION and PAUSED:
+            mouse_x, mouse_y = event.pos
+            velocity_x = (mouse_x - start_x) * 1000
+            velocity_y = (mouse_y - start_y) * 1000
+
     screen.fill((0, 0, 0))
     if not PAUSED:
         for body in planets:
@@ -101,6 +107,10 @@ while running:
     else:
         for body in planets:
             body.draw(screen)
+        if velocity_x is not None and velocity_y is not None:
+            label = myfont.render(
+                f"Velocity: x={velocity_x:.2e} ms, y={velocity_y:.2e}", True, (255, 255, 255))
+            screen.blit(label, (20, 20))
     pygame.display.flip()
     clock.tick(60)
 pygame.QUIT
