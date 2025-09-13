@@ -6,7 +6,7 @@ WIDTH, HEIGHT = 1500, 1000
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Gravitational Simulation")
 clock = pygame.time.Clock()
-infofont = pygame.font.SysFont("monospace", 20, bold=True)
+infofont = pygame.font.SysFont("monospace", 12, bold=True)
 labelfont = pygame.font.SysFont("monospace", 16, bold=True)
 # --- Simulation and UI constants ---
 
