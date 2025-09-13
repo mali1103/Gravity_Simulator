@@ -178,8 +178,8 @@ def remove_offscreen_bodies():
     for body in planets:
         dist_x = int(body.x * current_scale + WIDTH // 2)
         dist_y = int(body.y * current_scale + HEIGHT // 2)
-        if (dist_x < 0 or dist_y > WIDTH or
-            screen_y < 0 or screen_y > HEIGHT):
+        if (dist_x < 0 or dist_x > WIDTH or
+            dist_y < 0 or dist_y > HEIGHT):
             bodies_to_remove.append(body)
     for body in bodies_to_remove:
         planets.remove(body)
