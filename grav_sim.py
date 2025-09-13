@@ -170,19 +170,19 @@ def add_new_body():
 
 def remove_offscreen_bodies():
     """
-    Removes bodies that are off the screen in zoomed out view.
+    Removes bodies that are off the screen in the zoomed out view,
+    regardless of current zoom state.
     """
-    current_scale = SCALE  # Only check in zoomed out view
-    if not ZOOMED:
-        bodies_to_remove = []
-        for body in planets:
-            screen_x = int(body.x * current_scale + WIDTH // 2)
-            screen_y = int(body.y * current_scale + HEIGHT // 2)
-            if (screen_x < 0 or screen_x > WIDTH or
-                screen_y < 0 or screen_y > HEIGHT):
-                bodies_to_remove.append(body)
-        for body in bodies_to_remove:
-            planets.remove(body)
+    current_scale = SCALE  # Always use zoomed out scale for deletion
+    bodies_to_remove = []
+    for body in planets:
+        dist_x = int(body.x * current_scale + WIDTH // 2)
+        dist_y = int(body.y * current_scale + HEIGHT // 2)
+        if (dist_x < 0 or dist_y > WIDTH or
+            screen_y < 0 or screen_y > HEIGHT):
+            bodies_to_remove.append(body)
+    for body in bodies_to_remove:
+        planets.remove(body)
 
 
 def main():
