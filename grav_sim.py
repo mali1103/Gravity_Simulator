@@ -27,6 +27,19 @@ mass_text = ""
 next_mass = DEFAULT_MASS
 
 
+def drawGrid():
+    minor_grid_size = 20
+    for x in range(0, WIDTH, minor_grid_size):
+        for y in range(0, HEIGHT, minor_grid_size):
+            rect = pygame.Rect(x, y, minor_grid_size, minor_grid_size)
+            pygame.draw.rect(screen, (10, 10, 10), rect, 1)
+    major_grid_size = 100 #Set the size of the grid block
+    for x in range(0, WIDTH, major_grid_size):
+        for y in range(0, HEIGHT, major_grid_size):
+            rect = pygame.Rect(x, y, major_grid_size, major_grid_size)
+            pygame.draw.rect(screen, (40, 40, 40), rect, 1)
+    
+
 
 # --- Body class ---
 class Body:
@@ -197,7 +210,7 @@ def main():
                     current_scale = ZOOM_SCALE if ZOOMED else SCALE
                     if next_mass <= 1e20:
                         body_size = 4
-                        
+
                     elif next_mass <= 1e24:
                         body_size = 8
                     elif next_mass <= 1e28:
@@ -213,6 +226,7 @@ def main():
                 update_velocity(event.pos)
 
         screen.fill((0, 0, 0))
+        drawGrid()
         if not PAUSED:
             for body in planets:
                 body.update_position(planets)
