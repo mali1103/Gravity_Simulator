@@ -210,15 +210,18 @@ def main():
                     current_scale = ZOOM_SCALE if ZOOMED else SCALE
                     if next_mass <= 1e20:
                         body_size = 4
-
+                        body_colour = (100, 100, 100)
                     elif next_mass <= 1e24:
                         body_size = 8
+                        body_colour = (110, 110, 255)
                     elif next_mass <= 1e28:
                         body_size = 12
+                        body_colour = (255, 110, 110)
                     else:
                         body_size = 16
+                        body_colour = (255, 255, 200)
                     planets.append(Body(sim_x, sim_y, velocity_x,
-                                        velocity_y, next_mass, body_size, (160, 110, 255)))
+                                        velocity_y, next_mass, body_size, body_colour))
                     PAUSED = False
                 elif not input_active:
                     start_position(event.pos)
