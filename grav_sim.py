@@ -88,16 +88,22 @@ while running:
                                velocity_y, 5e29, 5, (160, 110, 255)))
                 PAUSED = False
             else:
-
                 start_x, start_y = event.pos
                 current_scale = ZOOM_SCALE if ZOOMED else SCALE
                 sim_x = (start_x - WIDTH // 2) / current_scale
                 sim_y = (start_y - HEIGHT // 2) / current_scale
                 PAUSED = True
+                # Reset velocity values for new drag
+                velocity_x = 0
+                velocity_y = 0
+                velocity_magnitude = 0.0  # <-- Add this line
+                mouse_x = start_x
+                mouse_y = start_y
         if event.type == pygame.MOUSEMOTION and PAUSED:
             mouse_x, mouse_y = event.pos
-            velocity_x = (mouse_x - start_x) * 1000
-            velocity_y = (mouse_y - start_y) * 1000
+            velocity_x = (mouse_x - start_x) * 10000
+            velocity_y = (mouse_y - start_y) * 10000
+            velocity_magnitude = math.sqrt(velocity_x**2 + velocity_y**2)
 
     screen.fill((0, 0, 0))
     if not PAUSED:
@@ -109,7 +115,9 @@ while running:
             body.draw(screen)
         if velocity_x is not None and velocity_y is not None:
             label = myfont.render(
-                f"Velocity: x={velocity_x:.2e} ms, y={velocity_y:.2e}", True, (255, 255, 255))
+                f"Velocity: x={velocity_x:.2e} m/s, y={velocity_y:.2e}, s={velocity_magnitude:.2e}",
+                True, (255, 255, 255))
+            pygame.draw.aaline(screen,(255,255,255),(start_x, start_y),(mouse_x, mouse_y))
             screen.blit(label, (20, 20))
     pygame.display.flip()
     clock.tick(60)
