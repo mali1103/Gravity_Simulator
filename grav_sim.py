@@ -78,7 +78,7 @@ def handle_mass_input(event):
     if event.key == pygame.K_RETURN:
         input_active = False
         try:
-            next_mass = float(mass_text)
+            next_mass = float(mass_text)*(10**20)
         except ValueError:
             next_mass = DEFAULT_MASS
     elif event.key == pygame.K_BACKSPACE:
@@ -119,8 +119,8 @@ def draw_paused_ui():
                            (start_x, start_y), (mouse_x, mouse_y))
         screen.blit(label, (20, 20))
     if input_active:
-        mass_label = myfont.render(f"Mass: {mass_text}", True, (255, 255, 0))
-        screen.blit(mass_label, (300, 20))
+        mass_label = myfont.render(f"Mass: {mass_text}e20 kg", True, (255, 255, 0))
+        screen.blit(mass_label, (1200, 20))
 
 
 # --- Main simulation loop ---
