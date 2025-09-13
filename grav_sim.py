@@ -2,21 +2,21 @@ import math
 import pygame
 
 pygame.init()
-
-# --- Simulation and UI constants ---
 WIDTH, HEIGHT = 1500, 1000
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Gravitational Simulation")
+clock = pygame.time.Clock()
+infofont = pygame.font.SysFont("monospace", 20, bold=True)
+labelfont = pygame.font.SysFont("monospace", 16, bold=True)
+# --- Simulation and UI constants ---
+
 GRAV_CONSTANT = 6.67430e-11
 TIME_STEP = 1000
 ZOOM_SCALE = 6e-11
 SCALE = 1e-9
-DEFAULT_MASS = 5e29
+DEFAULT_MASS = 1e20
 
 # --- State variables ---
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Gravitational Simulation")
-clock = pygame.time.Clock()
-myfont = pygame.font.SysFont("monospace", 20)
-
 ZOOMED = False
 PAUSED = False
 input_active = False
@@ -25,6 +25,7 @@ velocity_x = velocity_y = None
 mouse_x = mouse_y = start_x = start_y = sim_x = sim_y = 0
 mass_text = ""
 next_mass = DEFAULT_MASS
+
 
 
 # --- Body class ---
@@ -108,60 +109,123 @@ def update_velocity(pos):
     velocity_magnitude = math.sqrt(velocity_x**2 + velocity_y**2)
 
 
-def draw_paused_ui():
+def label_list_bodies():
+    """
+    Displays a list of all active bodies in the top left corner.
+    """
+    y_offset = 50
+    for i, body in enumerate(planets):
+        list_info = (
+            f"{i}: x={body.x:.2e}, y={body.y:.2e}, "
+            f"vx={body.vx:.2e}, vy={body.vy:.2e}, m={body.mass:.2e}"
+        )
+        list_of_bodies = infofont.render(list_info, True, (234,212,118))
+        screen.blit(list_of_bodies, (20, y_offset + i * 13))
+        label_info = f"{i}"
+        label_for_body = labelfont.render(label_info, True, body.color)
+        screen.blit(label_for_body, (int(body.x * (ZOOM_SCALE if ZOOMED else SCALE) + WIDTH // 2),
+                                      int(body.y * (ZOOM_SCALE if ZOOMED else SCALE) + HEIGHT // 2) - 5 * body.radius))
+
+    
+
+
+def add_new_body():
+    """
+    For every body in planets, the body will be drawn on the screen.
+
+    If the each component of the velocity has a value (is not None), then their value will be rendered on the screen
+    along with the magnitude of the velocity vector. A line is also rendered between the placement point of the body
+    and the mouses current position.
+
+    If the variable input_active is True, i.e. the user is choosing the mass of the new body, a label will be
+    generated showing the selected mass value.
+    """
     for body in planets:
         body.draw(screen)
     if velocity_x is not None and velocity_y is not None:
-        label = myfont.render(
+        velocity_label = infofont.render(
             f"Velocity: x={velocity_x:.2e} m/s, y={velocity_y:.2e} m/s, s={velocity_magnitude:.2e} m/s",
             True, (255, 255, 255))
         pygame.draw.aaline(screen, (255, 255, 255),
                            (start_x, start_y), (mouse_x, mouse_y))
-        screen.blit(label, (20, 20))
+        screen.blit(velocity_label, (20, 20))
     if input_active:
-        mass_label = myfont.render(f"Mass: {mass_text}e20 kg", True, (255, 255, 0))
+        mass_label = infofont.render(f"Mass: {mass_text}e20 kg", True, (255, 255, 0))
         screen.blit(mass_label, (1200, 20))
 
 
-# --- Main simulation loop ---
-planets = [
-    # Body(0, 0, 0, 0, 1.989e30, 4, (255, 255, 0)),
-]
 
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_z:
-                ZOOMED = not ZOOMED
-            for body in planets:
-                body.trail = []
-            if PAUSED and event.key == pygame.K_BACKSLASH:
-                input_active = True
-                mass_text = ""
-            if input_active:
-                handle_mass_input(event)
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-            if PAUSED and not input_active:
-                finish_x, finish_y = event.pos
-                current_scale = ZOOM_SCALE if ZOOMED else SCALE
-                planets.append(Body(sim_x, sim_y, velocity_x,
-                                    velocity_y, next_mass, 5, (160, 110, 255)))
-                PAUSED = False
-            elif not input_active:
-                start_position(event.pos)
-        elif event.type == pygame.MOUSEMOTION and PAUSED:
-            update_velocity(event.pos)
-
-    screen.fill((0, 0, 0))
-    if not PAUSED:
+def remove_offscreen_bodies():
+    """
+    Removes bodies that are off the screen in zoomed out view.
+    """
+    current_scale = SCALE  # Only check in zoomed out view
+    if not ZOOMED:
+        bodies_to_remove = []
         for body in planets:
-            body.update_position(planets)
-            body.draw(screen)
-    else:
-        draw_paused_ui()
-    pygame.display.flip()
-    clock.tick(60)
-pygame.QUIT
+            screen_x = int(body.x * current_scale + WIDTH // 2)
+            screen_y = int(body.y * current_scale + HEIGHT // 2)
+            if (screen_x < 0 or screen_x > WIDTH or
+                screen_y < 0 or screen_y > HEIGHT):
+                bodies_to_remove.append(body)
+        for body in bodies_to_remove:
+            planets.remove(body)
+
+
+def main():
+    global ZOOMED, PAUSED, input_active, velocity_x, velocity_y, mouse_x, mouse_y
+    global start_x, start_y, sim_x, sim_y, mass_text, next_mass, planets
+    planets = []
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_z:
+                    ZOOMED = not ZOOMED
+                for body in planets:
+                    body.trail = []
+                if PAUSED and event.key == pygame.K_BACKSLASH:
+                    input_active = True
+                    mass_text = ""
+                if input_active:
+                    handle_mass_input(event)
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                if PAUSED and not input_active:
+                    finish_x, finish_y = event.pos
+                    current_scale = ZOOM_SCALE if ZOOMED else SCALE
+                    if next_mass <= 1e20:
+                        body_size = 4
+                        
+                    elif next_mass <= 1e24:
+                        body_size = 8
+                    elif next_mass <= 1e28:
+                        body_size = 12
+                    else:
+                        body_size = 16
+                    planets.append(Body(sim_x, sim_y, velocity_x,
+                                        velocity_y, next_mass, body_size, (160, 110, 255)))
+                    PAUSED = False
+                elif not input_active:
+                    start_position(event.pos)
+            elif event.type == pygame.MOUSEMOTION and PAUSED:
+                update_velocity(event.pos)
+
+        screen.fill((0, 0, 0))
+        if not PAUSED:
+            for body in planets:
+                body.update_position(planets)
+                body.draw(screen)
+            remove_offscreen_bodies()
+            label_list_bodies()
+        else:
+            add_new_body()
+            label_list_bodies()
+        pygame.display.flip()
+        clock.tick(60)
+    pygame.QUIT
+
+
+if __name__ == "__main__":
+    main()
