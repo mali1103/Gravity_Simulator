@@ -8,7 +8,6 @@ pygame.display.set_caption("Gravitational Simulation")
 clock = pygame.time.Clock()
 infofont = pygame.font.SysFont("monospace", 12, bold=True)
 labelfont = pygame.font.SysFont("monospace", 16, bold=True)
-# --- Simulation and UI constants ---
 
 GRAV_CONSTANT = 6.67430e-11
 TIME_STEP = 1000
@@ -16,42 +15,18 @@ ZOOM_SCALE = 6e-11
 SCALE = 1e-9
 DEFAULT_MASS = 1e20
 
-# --- State variables ---
-ZOOMED = False
-PAUSED = False
-input_active = False
-
-velocity_x = velocity_y = None
-mouse_x = mouse_y = start_x = start_y = sim_x = sim_y = 0
-mass_text = ""
-next_mass = DEFAULT_MASS
-
-
-def drawGrid():
-    minor_grid_size = 20
-    for x in range(0, WIDTH, minor_grid_size):
-        for y in range(0, HEIGHT, minor_grid_size):
-            rect = pygame.Rect(x, y, minor_grid_size, minor_grid_size)
-            pygame.draw.rect(screen, (10, 10, 10), rect, 1)
-    major_grid_size = 100 #Set the size of the grid block
-    for x in range(0, WIDTH, major_grid_size):
-        for y in range(0, HEIGHT, major_grid_size):
-            rect = pygame.Rect(x, y, major_grid_size, major_grid_size)
-            pygame.draw.rect(screen, (40, 40, 40), rect, 1)
-    
-
 
 # --- Body class ---
 class Body:
-    def __init__(self, x, y, vx, vy, mass, radius, color):
-        self.x, self.y = x, y
+    def __init__(self, start_x, start_y, vx, vy, mass, radius, color):
+        self.x, self.y = start_x, start_y
         self.vx, self.vy = vx, vy
         self.mass = mass
         self.radius = radius
         self.color = color
         self.trail = []
 
-    def update_position(self, bodies):
+    def update_position(self, bodies, scale, zoomed):
         fx = fy = 0
         for body in bodies:
             if body != self:
@@ -70,177 +45,183 @@ class Body:
         self.x += self.vx * TIME_STEP
         self.y += self.vy * TIME_STEP
 
-        current_scale = ZOOM_SCALE if ZOOMED else SCALE
+        current_scale = ZOOM_SCALE if zoomed else SCALE
         self.trail.append((int(self.x * current_scale + WIDTH // 2),
                            int(self.y * current_scale + HEIGHT // 2)))
         if len(self.trail) > 2000:
             self.trail.pop(0)
 
-    def draw(self, screen):
+    def draw(self, screen, scale, zoomed):
         if len(self.trail) > 1:
             pygame.draw.lines(screen, (50, 50, 50), False, self.trail, 1)
-        current_scale = ZOOM_SCALE if ZOOMED else SCALE
+        current_scale = ZOOM_SCALE if zoomed else SCALE
         screen_x = int(self.x * current_scale + WIDTH // 2)
         screen_y = int(self.y * current_scale + HEIGHT // 2)
         pygame.draw.circle(screen, self.color,
                            (screen_x, screen_y), self.radius)
 
 
-# --- Helper functions ---
-def handle_mass_input(event):
-    global input_active, mass_text, next_mass
-    if event.key == pygame.K_RETURN:
-        input_active = False
-        try:
-            next_mass = float(mass_text)*(10**20)
-        except ValueError:
-            next_mass = DEFAULT_MASS
-    elif event.key == pygame.K_BACKSPACE:
-        mass_text = mass_text[:-1]
-    else:
-        if event.unicode.isdigit() or event.unicode in ".eE+-":
-            mass_text += event.unicode
+# --- Simulation class ---
+class Simulation:
+    def __init__(self):
+        self.zoomed = False
+        self.paused = False
+        self.input_active = False
+        self.velocity_x = None
+        self.velocity_y = None
+        self.velocity_magnitude = 0.0
+        self.mouse_x = 0
+        self.mouse_y = 0
+        self.start_x = 0
+        self.start_y = 0
+        self.sim_x = 0
+        self.sim_y = 0
+        self.mass_text = ""
+        self.next_mass = DEFAULT_MASS
+        self.planets = []
 
+    def handle_mass_input(self, event):
+        if event.key == pygame.K_RETURN:
+            self.input_active = False
+            try:
+                self.next_mass = float(self.mass_text)*(10**20)
+            except ValueError:
+                self.next_mass = DEFAULT_MASS
+        elif event.key == pygame.K_BACKSPACE:
+            self.mass_text = self.mass_text[:-1]
+        else:
+            if event.unicode.isdigit() or event.unicode in ".eE+-":
+                self.mass_text += event.unicode
 
-def start_position(pos):
-    global PAUSED, start_x, start_y, sim_x, sim_y, velocity_x, velocity_y, velocity_magnitude, mouse_x, mouse_y
-    current_scale = ZOOM_SCALE if ZOOMED else SCALE
-    start_x, start_y = pos
-    sim_x = (start_x - WIDTH // 2) / current_scale
-    sim_y = (start_y - HEIGHT // 2) / current_scale
-    velocity_x = velocity_y = 0
-    velocity_magnitude = 0.0
-    mouse_x, mouse_y = start_x, start_y
-    PAUSED = True
+    def start_position(self, pos):
+        current_scale = ZOOM_SCALE if self.zoomed else SCALE
+        self.start_x, self.start_y = pos
+        self.sim_x = (self.start_x - WIDTH // 2) / current_scale
+        self.sim_y = (self.start_y - HEIGHT // 2) / current_scale
+        self.velocity_x = self.velocity_y = 0
+        self.velocity_magnitude = 0.0
+        self.mouse_x, self.mouse_y = self.start_x, self.start_y
+        self.paused = True
 
+    def update_velocity(self, pos):
+        self.mouse_x, self.mouse_y = pos
+        self.velocity_x = (self.mouse_x - self.start_x) * 10000
+        self.velocity_y = (self.mouse_y - self.start_y) * 10000
+        self.velocity_magnitude = math.sqrt(
+            self.velocity_x**2 + self.velocity_y**2)
 
-def update_velocity(pos):
-    global mouse_x, mouse_y, velocity_x, velocity_y, velocity_magnitude
-    mouse_x, mouse_y = pos
-    velocity_x = (mouse_x - start_x) * 10000
-    velocity_y = (mouse_y - start_y) * 10000
-    velocity_magnitude = math.sqrt(velocity_x**2 + velocity_y**2)
+    def drawGrid(self):
+        minor_grid_size = 20
+        for x in range(0, WIDTH, minor_grid_size):
+            for y in range(0, HEIGHT, minor_grid_size):
+                rect = pygame.Rect(x, y, minor_grid_size, minor_grid_size)
+                pygame.draw.rect(screen, (10, 10, 10), rect, 1)
+        major_grid_size = 100
+        for x in range(0, WIDTH, major_grid_size):
+            for y in range(0, HEIGHT, major_grid_size):
+                rect = pygame.Rect(x, y, major_grid_size, major_grid_size)
+                pygame.draw.rect(screen, (40, 40, 40), rect, 1)
 
+    def label_list_bodies(self):
+        y_offset = 50
+        for i, body in enumerate(self.planets):
+            list_info = (
+                f"{i}: x={body.x:.2e}, y={body.y:.2e}, "
+                f"vx={body.vx:.2e}, vy={body.vy:.2e}, m={body.mass:.2e}"
+            )
+            list_of_bodies = infofont.render(list_info, True, (234, 212, 118))
+            screen.blit(list_of_bodies, (20, y_offset + i * 13))
+            label_info = f"{i}"
+            current_scale = ZOOM_SCALE if self.zoomed else SCALE
+            label_for_body = labelfont.render(label_info, True, body.color)
+            screen.blit(label_for_body, (int(body.x * current_scale + WIDTH // 2),
+                                         int(body.y * current_scale + HEIGHT // 2) - 5 * body.radius))
 
-def label_list_bodies():
-    """
-    Displays a list of all active bodies in the top left corner.
-    """
-    y_offset = 50
-    for i, body in enumerate(planets):
-        list_info = (
-            f"{i}: x={body.x:.2e}, y={body.y:.2e}, "
-            f"vx={body.vx:.2e}, vy={body.vy:.2e}, m={body.mass:.2e}"
-        )
-        list_of_bodies = infofont.render(list_info, True, (234,212,118))
-        screen.blit(list_of_bodies, (20, y_offset + i * 13))
-        label_info = f"{i}"
-        label_for_body = labelfont.render(label_info, True, body.color)
-        screen.blit(label_for_body, (int(body.x * (ZOOM_SCALE if ZOOMED else SCALE) + WIDTH // 2),
-                                      int(body.y * (ZOOM_SCALE if ZOOMED else SCALE) + HEIGHT // 2) - 5 * body.radius))
+    def add_new_body(self):
+        for body in self.planets:
+            body.draw(screen, SCALE, self.zoomed)
+        if self.velocity_x is not None and self.velocity_y is not None:
+            velocity_label = infofont.render(
+                f"Velocity: x={self.velocity_x:.2e} m/s, y={self.velocity_y:.2e} m/s, s={self.velocity_magnitude:.2e} m/s",
+                True, (255, 255, 255))
+            pygame.draw.aaline(screen, (255, 255, 255),
+                               (self.start_x, self.start_y), (self.mouse_x, self.mouse_y))
+            screen.blit(velocity_label, (20, 20))
+        if self.input_active:
+            mass_label = infofont.render(
+                f"Mass: {self.mass_text}e20 kg", True, (255, 255, 0))
+            screen.blit(mass_label, (1200, 20))
 
-    
+    def remove_offscreen_bodies(self):
+        current_scale = SCALE
+        bodies_to_remove = []
+        for body in self.planets:
+            dist_x = int(body.x * current_scale + WIDTH // 2)
+            dist_y = int(body.y * current_scale + HEIGHT // 2)
+            if (dist_x < 0 or dist_x > WIDTH or
+                    dist_y < 0 or dist_y > HEIGHT):
+                bodies_to_remove.append(body)
+        for body in bodies_to_remove:
+            self.planets.remove(body)
 
+    def run(self):
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_z:
+                        self.zoomed = not self.zoomed
+                    for body in self.planets:
+                        body.trail = []
+                    if self.paused and event.key == pygame.K_BACKSLASH:
+                        self.input_active = True
+                        self.mass_text = ""
+                    if self.input_active:
+                        self.handle_mass_input(event)
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                    if self.paused and not self.input_active:
+                        finish_x, finish_y = event.pos
+                        current_scale = ZOOM_SCALE if self.zoomed else SCALE
+                        if self.next_mass <= 1e20:
+                            body_size = 4
+                            body_colour = (100, 100, 100)
+                        elif self.next_mass <= 1e24:
+                            body_size = 8
+                            body_colour = (110, 110, 255)
+                        elif self.next_mass <= 1e28:
+                            body_size = 12
+                            body_colour = (255, 110, 110)
+                        else:
+                            body_size = 16
+                            body_colour = (255, 255, 200)
+                        self.planets.append(Body(self.sim_x, self.sim_y, self.velocity_x,
+                                                 self.velocity_y, self.next_mass, body_size, body_colour))
+                        self.paused = False
+                    elif not self.input_active:
+                        self.start_position(event.pos)
+                elif event.type == pygame.MOUSEMOTION and self.paused:
+                    self.update_velocity(event.pos)
 
-def add_new_body():
-    """
-    For every body in planets, the body will be drawn on the screen.
-
-    If the each component of the velocity has a value (is not None), then their value will be rendered on the screen
-    along with the magnitude of the velocity vector. A line is also rendered between the placement point of the body
-    and the mouses current position.
-
-    If the variable input_active is True, i.e. the user is choosing the mass of the new body, a label will be
-    generated showing the selected mass value.
-    """
-    for body in planets:
-        body.draw(screen)
-    if velocity_x is not None and velocity_y is not None:
-        velocity_label = infofont.render(
-            f"Velocity: x={velocity_x:.2e} m/s, y={velocity_y:.2e} m/s, s={velocity_magnitude:.2e} m/s",
-            True, (255, 255, 255))
-        pygame.draw.aaline(screen, (255, 255, 255),
-                           (start_x, start_y), (mouse_x, mouse_y))
-        screen.blit(velocity_label, (20, 20))
-    if input_active:
-        mass_label = infofont.render(f"Mass: {mass_text}e20 kg", True, (255, 255, 0))
-        screen.blit(mass_label, (1200, 20))
-
-
-
-def remove_offscreen_bodies():
-    """
-    Removes bodies that are off the screen in the zoomed out view,
-    regardless of current zoom state.
-    """
-    current_scale = SCALE  # Always use zoomed out scale for deletion
-    bodies_to_remove = []
-    for body in planets:
-        dist_x = int(body.x * current_scale + WIDTH // 2)
-        dist_y = int(body.y * current_scale + HEIGHT // 2)
-        if (dist_x < 0 or dist_x > WIDTH or
-            dist_y < 0 or dist_y > HEIGHT):
-            bodies_to_remove.append(body)
-    for body in bodies_to_remove:
-        planets.remove(body)
+            screen.fill((0, 0, 0))
+            self.drawGrid()
+            if not self.paused:
+                for body in self.planets:
+                    body.update_position(self.planets, SCALE, self.zoomed)
+                    body.draw(screen, SCALE, self.zoomed)
+                self.remove_offscreen_bodies()
+                self.label_list_bodies()
+            else:
+                self.add_new_body()
+                self.label_list_bodies()
+            pygame.display.flip()
+            clock.tick(60)
+        pygame.QUIT
 
 
 def main():
-    global ZOOMED, PAUSED, input_active, velocity_x, velocity_y, mouse_x, mouse_y
-    global start_x, start_y, sim_x, sim_y, mass_text, next_mass, planets
-    planets = []
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_z:
-                    ZOOMED = not ZOOMED
-                for body in planets:
-                    body.trail = []
-                if PAUSED and event.key == pygame.K_BACKSLASH:
-                    input_active = True
-                    mass_text = ""
-                if input_active:
-                    handle_mass_input(event)
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-                if PAUSED and not input_active:
-                    finish_x, finish_y = event.pos
-                    current_scale = ZOOM_SCALE if ZOOMED else SCALE
-                    if next_mass <= 1e20:
-                        body_size = 4
-                        body_colour = (100, 100, 100)
-                    elif next_mass <= 1e24:
-                        body_size = 8
-                        body_colour = (110, 110, 255)
-                    elif next_mass <= 1e28:
-                        body_size = 12
-                        body_colour = (255, 110, 110)
-                    else:
-                        body_size = 16
-                        body_colour = (255, 255, 200)
-                    planets.append(Body(sim_x, sim_y, velocity_x,
-                                        velocity_y, next_mass, body_size, body_colour))
-                    PAUSED = False
-                elif not input_active:
-                    start_position(event.pos)
-            elif event.type == pygame.MOUSEMOTION and PAUSED:
-                update_velocity(event.pos)
-
-        screen.fill((0, 0, 0))
-        drawGrid()
-        if not PAUSED:
-            for body in planets:
-                body.update_position(planets)
-                body.draw(screen)
-            remove_offscreen_bodies()
-            label_list_bodies()
-        else:
-            add_new_body()
-            label_list_bodies()
-        pygame.display.flip()
-        clock.tick(60)
+    Simulation().run()
     pygame.QUIT
 
 
